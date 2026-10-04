@@ -183,13 +183,13 @@ tests/test_observability.py      42
 tests/test_httpd.py              50
 tests/test_demo_integration.py   43
 tests/test_replay_consistency.py 37
-tests/test_redis_adapter.py      30
+tests/test_redis_adapter.py      32
 tests/test_faults.py             29
 tests/test_scheduler.py          26
 tests/test_traffic.py            25
 tests/test_idempotency.py        21
 ------------------------------------
-合计                            447   （全部通过；要求 ≥70）
+合计                            449   （全部通过；要求 ≥70）
 ```
 
 其中**注入已知故障并断言系统正确恢复**的测试至少 6 项（不含故障注入器本身的单元测试）：
@@ -332,7 +332,7 @@ fleet-dispatch-lab/
 │   ├── demo.py                场景套件、一致性判定、报告产出
 │   ├── plots.py               状态图 / 甘特图 / 积压图 / 场景对比图
 │   └── cli.py                 命令行接口与 Markdown 报告渲染
-├── tests/                     447 项测试（12 个文件）
+├── tests/                     449 项测试（12 个文件）
 ├── scripts/
 │   ├── smoke_api.py           真实 socket 调用全部 HTTP 端点
 │   └── check_readme.py        反查 README 里的数字/测试名/路径是否真实
@@ -348,7 +348,7 @@ fleet-dispatch-lab/
 ## 测试与 CI
 
 ```bash
-py -3.12 -m pytest tests -q                    # 447 项
+py -3.12 -m pytest tests -q                    # 449 项
 py -3.12 -m pytest tests -q -m redis_adapter   # 仅 Redis 适配层一致性
 py -3.12 -m pytest tests/test_replay_consistency.py -q
 ```
@@ -356,7 +356,7 @@ py -3.12 -m pytest tests/test_replay_consistency.py -q
 CI（`.github/workflows/ci.yml`）在 **Ubuntu + Windows / Python 3.12** 上执行：
 
 1. 安装 `.[dev]`，并**断言核心模块在没有 matplotlib / redis / fakeredis 时也能导入**（零依赖是硬约束，用测试守住）
-2. 跑全部 447 项测试
+2. 跑全部 449 项测试
 3. 跑完整演示 `fleetlab demo --out reports`
 4. 跑 `fleetlab verify-repro`（两次运行逐字节比对）
 5. 比对重新生成的 `metrics.json` 与仓库中已提交的基准摘要 `reports/metrics.committed.sha256`
