@@ -1,0 +1,12 @@
+{
+  "note": "wall-clock values live here only; metrics.json excludes them",
+  "per_scenario_seconds": {
+    "baseline": 0.325,
+    "cache-expiry": 0.098,
+    "deadlock": 0.411,
+    "fault-injection": 0.276,
+    "offline-recovery": 0.106,
+    "overload": 0.428
+  },
+  "total_seconds": 1.645
+}
