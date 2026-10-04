@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install (runtime has no third-party dependencies)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Confirm the runtime imports without the optional extras
+        shell: bash
+        run: |
+          python - <<'PY'
+          import importlib, sys
+          # The platform must import with matplotlib and redis absent.  Importing
+          # them is allowed only inside the modules that opt in to them, so a stray
+          # top-level import would be caught here rather than in production.
+          for name in ("matplotlib", "redis", "fakeredis"):
+              sys.modules[name] = None
+          for module in ("fleetlab.sim", "fleetlab.runtime", "fleetlab.bus",
+                         "fleetlab.cache", "fleetlab.httpd", "fleetlab.cli",
+                         "fleetlab.demo", "fleetlab.faults", "fleetlab.traffic"):
+              importlib.import_module(module)
+          print("core modules import cleanly without optional extras")
+          PY
+
+      - name: Unit tests
+        run: python -m pytest tests -q
+
+      - name: Demo suite (writes reports/)
+        run: python -m fleetlab demo --out reports
+
+      - name: Reproducibility — two runs must be byte-identical
+        run: python -m fleetlab verify-repro --out reports
+        # Also compares the regenerated metrics against the committed reference
+        # digest when one is present.
+
+      - name: Reproducibility — regenerated metrics must match the committed reference
+        shell: bash
+        run: |
+          if [ ! -f reports/metrics.committed.sha256 ]; then
+            echo "no committed reference digest present; skipping"
+            exit 0
+          fi
+          python - <<'PY'
+          import pathlib, sys
+          sys.path.insert(0, ".")
+          from fleetlab.cli import metrics_digest
+
+          expected = pathlib.Path("reports/metrics.committed.sha256").read_text().split()[0]
+          actual = metrics_digest("reports/metrics.json")
+          if expected != actual:
+              print(f"::error::metrics differ from the committed reference ({expected} != {actual})")
+              sys.exit(1)
+          print(f"regenerated metrics match the committed reference ({actual[:16]}...)")
+          PY
+
+      - name: Journal replay verification
+        run: python -m fleetlab replay
+
+      - name: README cross-check (no fabricated numbers)
+        run: python scripts/check_readme.py
+
+      - name: HTTP API smoke test (starts a real server and calls every endpoint)
+        run: python scripts/smoke_api.py
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.os }}
+          path: reports/
+          if-no-files-found: warn
