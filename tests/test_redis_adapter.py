@@ -92,6 +92,30 @@ def run_sequence(store) -> list:
     return results
 
 
+def _compare(memory_result, redis_result) -> str:
+    """Compare two step results; return ``""`` when they agree, else a description.
+
+    Positive TTLs are compared with a one-second tolerance on purpose.  Both
+    backends count down against *their own* clock — the in-memory store uses
+    ``time.monotonic()`` and fakeredis its own — so on a loaded CI runner a whole
+    second can elapse between the two calls and an exact comparison reports a
+    difference that is pure scheduling noise.  That is a flaky test, not a
+    conformance failure: the semantics under test are "a TTL counts down" and the
+    sentinel values ``-2`` (missing) and ``-1`` (no expiry), which are compared
+    exactly.
+    """
+    op, args, expected = memory_result
+    actual = redis_result[2]
+    if op == "ttl" and isinstance(expected, int) and isinstance(actual, int):
+        if expected > 0 and actual > 0:
+            if abs(expected - actual) <= 1:
+                return ""
+            return f"ttl drift {expected} vs {actual} for {args}"
+    if expected != actual:
+        return f"{op}{args}: memory={expected!r} redis={actual!r}"
+    return ""
+
+
 def test_conformance_sequence_agrees_between_backends():
     """The whole point: one code path, two backends, identical results."""
     memory = TTLStore(name="mem")
@@ -102,14 +126,41 @@ def test_conformance_sequence_agrees_between_backends():
 
     assert len(memory_results) == len(redis_results)
     mismatches = [
-        (m, r) for m, r in zip(memory_results, redis_results) if m[2] != r[2]
+        note
+        for left, right in zip(memory_results, redis_results)
+        if (note := _compare(left, right))
     ]
-    assert mismatches == [], f"backends disagree at {len(mismatches)} step(s)"
+    assert mismatches == [], f"backends disagree: {mismatches}"
 
 
 def test_conformance_sequence_covers_a_meaningful_number_of_operations():
     """Guard against the sequence being trimmed to nothing."""
     assert len(CONFORMANCE_SEQUENCE) >= 35
+
+
+def test_the_tolerance_only_applies_to_positive_ttls():
+    """The leniency must not swallow a real disagreement."""
+    assert _compare(("ttl", ("k",), 100), ("ttl", ("k",), 100)) == ""
+    assert _compare(("ttl", ("k",), 100), ("ttl", ("k",), 99)) == ""
+    assert _compare(("ttl", ("k",), 100), ("ttl", ("k",), 97)) != ""
+    # Sentinels are exact: -2 is "missing" and -1 is "no expiry", not "about -1".
+    assert _compare(("ttl", ("k",), -2), ("ttl", ("k",), -1)) != ""
+    assert _compare(("ttl", ("k",), -1), ("ttl", ("k",), 5)) != ""
+    assert _compare(("get", ("k",), "v"), ("get", ("k",), "w")) != ""
+    assert _compare(("get", ("k",), "v"), ("get", ("k",), "v")) == ""
+
+
+def test_ttl_sentinels_agree_exactly_across_backends():
+    """-2 and -1 are the values callers branch on, so they must match exactly."""
+    memory = TTLStore()
+    redis_store = make_redis_store()
+    for store in (memory, redis_store):
+        store.set("persistent", "v")
+        store.set("timed", "v", ttl=100)
+    assert memory.ttl("missing") == redis_store.ttl("missing") == TTL_MISSING
+    assert memory.ttl("persistent") == redis_store.ttl("persistent") == TTL_NO_EXPIRY
+    assert memory.ttl("timed") > 0 and redis_store.ttl("timed") > 0
+    assert abs(memory.ttl("timed") - redis_store.ttl("timed")) <= 1
 
 
 def test_the_two_backends_start_from_an_empty_and_equal_state():
