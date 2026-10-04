@@ -1,0 +1,25 @@
+# Normalise line endings everywhere, on every platform.
+#
+# This is not cosmetic.  `reports/metrics.json` is compared byte-for-byte — by CI
+# against a committed reference, and by `fleetlab verify-repro` between two runs.
+# With Git's default `core.autocrlf`, a Windows checkout turns every LF into CRLF,
+# the file grows by one byte per line (~119 kB here), and the comparison fails on
+# exactly one of the two CI runners for reasons unrelated to the code.
+#
+# Text files are therefore stored and checked out with LF on all platforms; binary
+# artefacts are left untouched.
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.jsonl text eol=lf
+*.csv   text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.txt   text eol=lf
+
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.pdf   binary

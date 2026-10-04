@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fleet-dispatch-lab"
+version = "1.0.0"
+description = "Event-driven fleet task dispatch and real-time state platform (port autonomous driving simulation lab)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "meminehobe24435-cmyk" }]
+keywords = ["dispatch", "scheduler", "event-driven", "message-bus", "fleet", "simulation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+# Runtime implementation is standard-library only. No third-party runtime deps.
+dependencies = []
+
+[project.optional-dependencies]
+# Optional extras used only for reports (PNG figures) and the Redis adapter tests.
+plots = ["matplotlib>=3.7"]
+redis = ["redis>=5.0"]
+dev = [
+    "pytest>=7.0",
+    "matplotlib>=3.7",
+    "redis>=5.0",
+    "fakeredis>=2.20",
+]
+
+[project.scripts]
+fleetlab = "fleetlab.cli:main"
+
+[tool.setuptools]
+packages = ["fleetlab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "redis_adapter: tests that exercise the Redis adapter against fakeredis",
+    "matplotlib: tests that require matplotlib for figure generation",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

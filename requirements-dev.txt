@@ -1,0 +1,12 @@
+# Development dependencies.
+#
+# The *platform* has no third-party runtime dependencies.  Everything listed here
+# is for tests and for generating the report figures, and the test suite skips
+# gracefully (rather than failing) when they are missing.
+#
+#   py -3.12 -m pip install -r requirements-dev.txt
+#
+pytest>=7.0
+matplotlib>=3.7
+redis>=5.0
+fakeredis>=2.20
